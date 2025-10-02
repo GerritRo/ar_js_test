@@ -40,6 +40,11 @@
             margin-top: 5px;
         }
         
+        .status-overlay .heading {
+            color: #00ffff;
+            margin-top: 5px;
+        }
+        
         .permission-prompt {
             position: fixed;
             top: 50%;
@@ -63,6 +68,24 @@
             font-size: 16px;
             cursor: pointer;
         }
+        
+        .controls {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            z-index: 999;
+        }
+        
+        .controls button {
+            display: block;
+            margin: 5px 0;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border: 1px solid white;
+            border-radius: 5px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -73,6 +96,16 @@
         <div class="coords">Lng: <span id="lng">--</span></div>
         <div class="coords">Accuracy: <span id="accuracy">--</span>m</div>
         <div class="distance">Distance to Object: <span id="distance">--</span>m</div>
+        <div class="heading">Compass: <span id="heading">--</span>°</div>
+        <div class="heading">Camera Active: <span id="camera-status">No</span></div>
+    </div>
+    
+    <!-- Controls for adjusting position -->
+    <div class="controls">
+        <button onclick="adjustAltitude(5)">Raise Objects +5m</button>
+        <button onclick="adjustAltitude(-5)">Lower Objects -5m</button>
+        <button onclick="resetAltitude()">Reset Altitude</button>
+        <button onclick="useCurrentLocation()">Use My Location</button>
     </div>
     
     <!-- Permission prompt (initially hidden) -->
@@ -89,51 +122,170 @@
         embedded
         renderer="logarithmicDepthBuffer: true; precision: high; antialias: true; alpha: true;">
         
-        <!-- Camera with GPS tracking -->
+        <!-- Camera with GPS tracking - adjusted parameters for better tracking -->
         <a-camera 
             id="camera"
-            gps-new-camera="gpsMinDistance: 5; positionMinAccuracy: 100; alert: true;"
+            gps-new-camera="gpsMinDistance: 1; positionMinAccuracy: 20; alert: true;"
             rotation-reader
+            position="0 0 0"
             look-controls="enabled: false"
-            arjs-device-orientation-controls>
+            arjs-device-orientation-controls
+            cursor="rayOrigin: mouse"
+            raycaster="objects: [gps-new-entity-place]">
         </a-camera>
         
-        <!-- Test object: A large red cube at specific GPS coordinates -->
-        <!-- Replace these coordinates with your actual location -->
+        <!-- Main 15x15x15 meter cube with bright color and wireframe for visibility -->
         <a-box
-            id="test-box"
-            color="red"
-            scale="5 5 5"
+            id="test-box-main"
+            material="color: #FF0000; opacity: 0.7; wireframe: false;"
+            scale="15 15 15"
+            position="0 7.5 0"
             gps-new-entity-place="latitude: 49.5749; longitude: 11.0293;"
-            animation="property: rotation; to: 0 360 0; loop: true; dur: 10000">
+            animation="property: rotation; to: 0 360 0; loop: true; dur: 20000">
         </a-box>
         
-        <!-- Ground plane indicator -->
+        <!-- Wireframe overlay for better visibility -->
+        <a-box
+            id="test-box-wireframe"
+            material="color: #FFFF00; wireframe: true; wireframeLinewidth: 2;"
+            scale="15 15 15"
+            position="0 7.5 0"
+            gps-new-entity-place="latitude: 49.5749; longitude: 11.0293;">
+        </a-box>
+        
+        <!-- Ground level marker - 1m cube at ground -->
+        <a-box
+            id="ground-marker"
+            material="color: #00FF00; opacity: 0.8;"
+            scale="1 1 1"
+            position="0 0.5 0"
+            gps-new-entity-place="latitude: 49.5749; longitude: 11.0293;">
+        </a-box>
+        
+        <!-- Tall pole to help locate objects - 30m high -->
+        <a-cylinder
+            id="location-pole"
+            material="color: #0000FF; opacity: 0.8;"
+            radius="0.5"
+            height="30"
+            position="0 15 0"
+            gps-new-entity-place="latitude: 49.5749; longitude: 11.0293;">
+        </a-cylinder>
+        
+        <!-- Ground plane indicator - larger and more visible -->
         <a-plane
             id="ground-plane"
-            color="yellow"
+            material="color: #FFFF00; opacity: 0.3; side: double;"
             rotation="-90 0 0"
-            scale="10 10 1"
-            opacity="0.5"
+            scale="25 25 1"
+            position="0 0.1 0"
             gps-new-entity-place="latitude: 49.5749; longitude: 11.0293;">
         </a-plane>
+        
+        <!-- Text label floating above -->
+        <a-text
+            id="label"
+            value="15m CUBE HERE"
+            scale="10 10 10"
+            position="0 20 0"
+            align="center"
+            color="#FFFFFF"
+            gps-new-entity-place="latitude: 49.5749; longitude: 11.0293;">
+        </a-text>
         
     </a-scene>
     
     <script>
         // Configuration - UPDATE THESE WITH YOUR ACTUAL COORDINATES
         const TARGET_LOCATION = {
-            latitude: 49.58072,  // Replace with your lawn's latitude
-            longitude: 11.03113  // Replace with your lawn's longitude
+            latitude: 49.5749,  // Replace with your lawn's latitude
+            longitude: 11.0293  // Replace with your lawn's longitude
         };
         
         let userLocation = null;
         let watchId = null;
+        let currentAltitude = 0;
         
         // Request permissions
         function requestPermissions() {
             document.getElementById('permission-prompt').style.display = 'none';
             startLocationTracking();
+            
+            // Also request camera permissions explicitly
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(stream => {
+                        console.log('Camera access granted');
+                        document.getElementById('camera-status').textContent = 'Yes';
+                        document.getElementById('camera-status').style.color = '#00ff00';
+                        // Stop the stream immediately, AR.js will handle it
+                        stream.getTracks().forEach(track => track.stop());
+                    })
+                    .catch(err => {
+                        console.error('Camera access denied:', err);
+                        document.getElementById('camera-status').textContent = 'Error';
+                        document.getElementById('camera-status').style.color = '#ff0000';
+                    });
+            }
+        }
+        
+        // Adjust altitude of all objects
+        function adjustAltitude(delta) {
+            currentAltitude += delta;
+            const entities = document.querySelectorAll('[gps-new-entity-place]');
+            entities.forEach(entity => {
+                const position = entity.getAttribute('position');
+                if (position) {
+                    entity.setAttribute('position', {
+                        x: position.x,
+                        y: position.y + delta,
+                        z: position.z
+                    });
+                }
+            });
+            console.log('Adjusted altitude by', delta, 'meters. Total offset:', currentAltitude);
+            alert(`Objects moved ${delta > 0 ? 'up' : 'down'} by ${Math.abs(delta)}m`);
+        }
+        
+        function resetAltitude() {
+            const entities = document.querySelectorAll('[gps-new-entity-place]');
+            entities.forEach((entity, index) => {
+                // Reset to original positions
+                if (entity.id === 'test-box-main' || entity.id === 'test-box-wireframe') {
+                    entity.setAttribute('position', '0 7.5 0');
+                } else if (entity.id === 'ground-marker') {
+                    entity.setAttribute('position', '0 0.5 0');
+                } else if (entity.id === 'location-pole') {
+                    entity.setAttribute('position', '0 15 0');
+                } else if (entity.id === 'ground-plane') {
+                    entity.setAttribute('position', '0 0.1 0');
+                } else if (entity.id === 'label') {
+                    entity.setAttribute('position', '0 20 0');
+                }
+            });
+            currentAltitude = 0;
+            alert('Altitude reset to original values');
+        }
+        
+        // Use current GPS location as object location
+        function useCurrentLocation() {
+            if (userLocation) {
+                const lat = userLocation.coords.latitude;
+                const lng = userLocation.coords.longitude;
+                
+                // Update all entities to current location
+                const entities = document.querySelectorAll('[gps-new-entity-place]');
+                entities.forEach(entity => {
+                    entity.setAttribute('gps-new-entity-place', `latitude: ${lat}; longitude: ${lng};`);
+                });
+                
+                TARGET_LOCATION.latitude = lat;
+                TARGET_LOCATION.longitude = lng;
+                
+                alert(`Objects moved to your current location:\nLat: ${lat.toFixed(6)}\nLng: ${lng.toFixed(6)}`);
+            } else {
+                alert('GPS location not available yet');
+            }
         }
         
         // Calculate distance between two GPS points using Haversine formula
@@ -158,6 +310,10 @@
             document.getElementById('lng').textContent = position.coords.longitude.toFixed(6);
             document.getElementById('accuracy').textContent = position.coords.accuracy.toFixed(1);
             
+            if (position.coords.heading !== null) {
+                document.getElementById('heading').textContent = position.coords.heading.toFixed(1);
+            }
+            
             const distance = calculateDistance(
                 position.coords.latitude,
                 position.coords.longitude,
@@ -168,6 +324,16 @@
             document.getElementById('distance').textContent = distance.toFixed(1);
             document.getElementById('gps-status').textContent = 'Active';
             document.getElementById('gps-status').style.color = '#00ff00';
+            
+            // Log for debugging
+            console.log('GPS Update:', {
+                userLat: position.coords.latitude,
+                userLng: position.coords.longitude,
+                targetLat: TARGET_LOCATION.latitude,
+                targetLng: TARGET_LOCATION.longitude,
+                distance: distance,
+                accuracy: position.coords.accuracy
+            });
         }
         
         // Start GPS tracking
@@ -186,12 +352,14 @@
                         userLocation = position;
                         updateStatus(position);
                         
-                        // Update AR.js entities with current position
+                        // Update camera position
                         const camera = document.getElementById('camera');
                         if (camera) {
+                            // Remove simulation attributes once we have real GPS
                             camera.setAttribute('gps-new-camera', {
-                                positionMinAccuracy: 100,
-                                gpsMinDistance: 5
+                                positionMinAccuracy: 20,
+                                gpsMinDistance: 1,
+                                alert: true
                             });
                         }
                     },
@@ -222,30 +390,61 @@
             }
         }
         
+        // Monitor device orientation
+        window.addEventListener('deviceorientation', (event) => {
+            if (event.alpha !== null) {
+                document.getElementById('heading').textContent = event.alpha.toFixed(1);
+            }
+        });
+        
         // Initialize on page load
         window.addEventListener('load', () => {
+            // Check camera stream status
+            const scene = document.querySelector('a-scene');
+            if (scene) {
+                scene.addEventListener('camera-init', () => {
+                    console.log('AR.js camera initialized');
+                    document.getElementById('camera-status').textContent = 'Yes';
+                    document.getElementById('camera-status').style.color = '#00ff00';
+                });
+                
+                scene.addEventListener('camera-error', () => {
+                    console.log('AR.js camera error');
+                    document.getElementById('camera-status').textContent = 'Error';
+                    document.getElementById('camera-status').style.color = '#ff0000';
+                });
+            }
+            
             // Check if we need to show permission prompt
             if (navigator.permissions) {
                 navigator.permissions.query({name: 'geolocation'}).then((result) => {
                     if (result.state === 'granted') {
-                        startLocationTracking();
+                        requestPermissions(); // Also requests camera
                     } else {
                         document.getElementById('permission-prompt').style.display = 'block';
                     }
                 });
             } else {
                 // Fallback for browsers without Permissions API
-                startLocationTracking();
+                requestPermissions();
             }
             
-            // Add event listeners for AR.js
+            // Add event listeners for AR.js debugging
             window.addEventListener('gps-camera-update-position', e => {
-                console.log('Camera GPS position updated:', e.detail);
+                console.log('📍 Camera GPS position updated:', e.detail);
             });
             
             window.addEventListener('gps-entity-place-update-position', e => {
-                console.log('Entity position updated:', e.detail);
+                console.log('📦 Entity position updated:', e.detail);
             });
+            
+            window.addEventListener('gps-entity-place-added', e => {
+                console.log('✅ Entity added to scene:', e.detail);
+            });
+            
+            // Log AR.js initialization
+            console.log('AR.js Location-based AR initialized');
+            console.log('Target location:', TARGET_LOCATION);
         });
         
         // Clean up on page unload
