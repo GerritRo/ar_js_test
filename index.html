@@ -29,7 +29,7 @@
               this.hasInitial = true;
             }
 
-            // Smooth position
+            // Smooth world position
             this.smoothedPosition.lerp(obj.position, this.data.lerpFactor);
             obj.position.copy(this.smoothedPosition);
 
@@ -39,11 +39,9 @@
           }
         });
 
-        // Clamp Y to a fixed altitude
+        // Clamp altitude in world space (optional)
         AFRAME.registerComponent('fixed-altitude', {
-          schema: {
-            y: {type: 'number', default: 0} // default ground level
-          },
+          schema: { y: {type: 'number', default: 0} },
           tick: function () {
             this.el.object3D.position.y = this.data.y;
           }
@@ -57,13 +55,13 @@
         embedded
         arjs='sourceType: webcam; sourceWidth:1280; sourceHeight:960; displayWidth:1280; displayHeight:960; debugUIEnabled: true;'>
 
-        <!-- Camera: reduced jitter -->
+        <!-- Camera: standard GPS camera with min distance + max accuracy -->
         <a-camera gps-camera rotation-reader 
                   gpsMinDistance="5" 
                   gpsMaxAccuracy="30">
         </a-camera>
 
-        <!-- Your model, now smoothed + clamped at ground level -->
+        <!-- Cube anchored to real GPS location, smoothed, optional fixed altitude -->
         <a-entity gltf-model="./assets/animated_cube/AnimatedCube.gltf" 
                   rotation="0 180 0" 
                   scale="1 1 1" 
