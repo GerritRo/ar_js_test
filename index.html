@@ -9,17 +9,69 @@
     <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
     <script>
         THREEx.ArToolkitContext.baseURL = 'https://raw.githack.com/jeromeetienne/ar.js/master/three.js/'
+
+        // Smooth interpolation for GPS-based objects
+        AFRAME.registerComponent('smooth-gps', {
+          schema: {
+            lerpFactor: {type: 'number', default: 0.1} // 0.1 = smooth, 1.0 = instant
+          },
+          init: function () {
+            this.smoothedPosition = new THREE.Vector3();
+            this.smoothedQuaternion = new THREE.Quaternion();
+            this.hasInitial = false;
+          },
+          tick: function () {
+            let obj = this.el.object3D;
+
+            if (!this.hasInitial) {
+              this.smoothedPosition.copy(obj.position);
+              this.smoothedQuaternion.copy(obj.quaternion);
+              this.hasInitial = true;
+            }
+
+            // Smooth position
+            this.smoothedPosition.lerp(obj.position, this.data.lerpFactor);
+            obj.position.copy(this.smoothedPosition);
+
+            // Smooth rotation
+            this.smoothedQuaternion.slerp(obj.quaternion, this.data.lerpFactor);
+            obj.quaternion.copy(this.smoothedQuaternion);
+          }
+        });
+
+        // Clamp Y to a fixed altitude
+        AFRAME.registerComponent('fixed-altitude', {
+          schema: {
+            y: {type: 'number', default: 0} // default ground level
+          },
+          tick: function () {
+            this.el.object3D.position.y = this.data.y;
+          }
+        });
     </script>
 </head>
 
 <body style='margin: 0; overflow: hidden;'>
     <a-scene
         vr-mode-ui="enabled: false"
-		embedded
-        arjs='sourceType: webcam; sourceWidth:1280; sourceHeight:960; displayWidth: 1280; displayHeight: 960; debugUIEnabled: true;'>
-        
-        <a-camera gps-camera rotation-reader></a-camera>
+        embedded
+        arjs='sourceType: webcam; sourceWidth:1280; sourceHeight:960; displayWidth:1280; displayHeight:960; debugUIEnabled: true;'>
 
-        <a-entity gltf-model="./assets/animated_cube/AnimatedCube.gltf" rotation="0 180 0" scale="1.0 1.0 1.0" gps-entity-place="longitude: 11.031220; latitude: 49.580730;" animation-mixer/>
-	</a-scene>
+        <!-- Camera: reduced jitter -->
+        <a-camera gps-camera rotation-reader 
+                  gpsMinDistance="5" 
+                  gpsMaxAccuracy="30">
+        </a-camera>
+
+        <!-- Your model, now smoothed + clamped at ground level -->
+        <a-entity gltf-model="./assets/animated_cube/AnimatedCube.gltf" 
+                  rotation="0 180 0" 
+                  scale="1 1 1" 
+                  gps-entity-place="longitude: 11.031220; latitude: 49.580730;" 
+                  animation-mixer
+                  smooth-gps="lerpFactor: 0.05"
+                  fixed-altitude="y: 0">
+        </a-entity>
+    </a-scene>
 </body>
+</html>
