@@ -2,295 +2,531 @@
 <html>
 <head>
     <meta charset='utf-8'>
-    <meta http-equiv='X-UA-Compatible' content='IE=edge'>
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-    <title>AR.js Geolocation Experience</title>
+    <title>LocAR.js Geolocation AR Experience</title>
     
-    <!-- A-Frame and AR.js libraries -->
-    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+    <!-- LocAR.js Library -->
+    <script src="https://unpkg.com/@ar-js-org/locar@latest/dist/locar.min.js"></script>
+    
+    <!-- Three.js for 3D rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
     <style>
-        .status-overlay {
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+        }
+        
+        #debug-console {
             position: fixed;
             top: 10px;
             left: 10px;
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 10px 15px;
-            border-radius: 5px;
-            font-family: monospace;
-            font-size: 12px;
-            z-index: 999;
-            max-width: 300px;
-        }
-        
-        .status-overlay .coords {
-            color: #00ff00;
-            margin-top: 5px;
-        }
-        
-        .status-overlay .distance {
-            color: #ffff00;
-            margin-top: 5px;
-        }
-        
-        .status-overlay .error {
-            color: #ff0000;
-            margin-top: 5px;
-        }
-        
-        .status-overlay .heading {
-            color: #00ffff;
-            margin-top: 5px;
-        }
-        
-        .permission-prompt {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            width: 350px;
+            max-height: 80vh;
             background: rgba(0, 0, 0, 0.9);
-            color: white;
-            padding: 30px;
-            border-radius: 10px;
-            text-align: center;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #00ff00;
+            font-size: 11px;
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        
+        #debug-console h3 {
+            margin: 0 0 10px 0;
+            color: #ffffff;
+            border-bottom: 1px solid #00ff00;
+            padding-bottom: 5px;
+        }
+        
+        .debug-section {
+            margin-bottom: 15px;
+            padding: 5px;
+            background: rgba(0, 255, 0, 0.05);
+            border-left: 2px solid #00ff00;
+        }
+        
+        .debug-value {
+            color: #ffff00;
+            font-weight: bold;
+        }
+        
+        .debug-error {
+            color: #ff0000;
+            font-weight: bold;
+        }
+        
+        .debug-success {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        
+        .debug-log {
+            margin-top: 10px;
+            padding: 5px;
+            background: rgba(255, 255, 255, 0.05);
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px;
+            border-left: 2px solid #666;
+        }
+        
+        .log-entry.error {
+            border-color: #ff0000;
+            color: #ff6666;
+        }
+        
+        .log-entry.success {
+            border-color: #00ff00;
+            color: #66ff66;
+        }
+        
+        .log-entry.info {
+            border-color: #ffff00;
+            color: #ffff66;
+        }
+        
+        #ar-view {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #control-panel {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
             z-index: 1000;
         }
         
-        .permission-prompt button {
-            margin-top: 20px;
-            padding: 10px 30px;
-            background: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-        
-        .controls {
-            position: fixed;
-            bottom: 10px;
-            left: 10px;
-            z-index: 999;
-        }
-        
-        .controls button {
+        .control-button {
             display: block;
             margin: 5px 0;
-            padding: 10px;
+            padding: 10px 15px;
             background: rgba(0, 0, 0, 0.8);
-            color: white;
-            border: 1px solid white;
+            color: #00ff00;
+            border: 1px solid #00ff00;
             border-radius: 5px;
             cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        
+        .control-button:active {
+            background: rgba(0, 255, 0, 0.2);
+        }
+        
+        #video-feed {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        #three-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
         }
     </style>
 </head>
 <body>
-    <!-- Status overlay for debugging -->
-    <div id="status" class="status-overlay">
-        <div>GPS Status: <span id="gps-status">Initializing...</span></div>
-        <div class="coords">Lat: <span id="lat">--</span></div>
-        <div class="coords">Lng: <span id="lng">--</span></div>
-        <div class="coords">Accuracy: <span id="accuracy">--</span>m</div>
-        <div class="distance">Distance to Object: <span id="distance">--</span>m</div>
-        <div class="heading">Compass: <span id="heading">--</span>°</div>
-        <div class="heading">Camera Active: <span id="camera-status">No</span></div>
+    <!-- Video feed from camera -->
+    <video id="video-feed" autoplay playsinline></video>
+    
+    <!-- Three.js canvas overlay -->
+    <canvas id="three-canvas"></canvas>
+    
+    <!-- Debug Console -->
+    <div id="debug-console">
+        <h3>🔧 LocAR.js Debug Console</h3>
+        
+        <div class="debug-section">
+            <strong>📍 GPS Status</strong><br>
+            Status: <span id="gps-status" class="debug-value">Initializing...</span><br>
+            Latitude: <span id="gps-lat" class="debug-value">--</span><br>
+            Longitude: <span id="gps-lng" class="debug-value">--</span><br>
+            Accuracy: <span id="gps-accuracy" class="debug-value">--</span>m<br>
+            Altitude: <span id="gps-altitude" class="debug-value">--</span>m<br>
+            Heading: <span id="gps-heading" class="debug-value">--</span>°
+        </div>
+        
+        <div class="debug-section">
+            <strong>📦 Object Tracking</strong><br>
+            Target Lat: <span id="target-lat" class="debug-value">--</span><br>
+            Target Lng: <span id="target-lng" class="debug-value">--</span><br>
+            Distance: <span id="object-distance" class="debug-value">--</span>m<br>
+            Bearing: <span id="object-bearing" class="debug-value">--</span>°<br>
+            Relative X: <span id="object-x" class="debug-value">--</span><br>
+            Relative Y: <span id="object-y" class="debug-value">--</span><br>
+            Relative Z: <span id="object-z" class="debug-value">--</span><br>
+            On Screen: <span id="object-visible" class="debug-value">--</span>
+        </div>
+        
+        <div class="debug-section">
+            <strong>📱 Device Sensors</strong><br>
+            Camera: <span id="camera-status" class="debug-value">--</span><br>
+            Orientation α: <span id="device-alpha" class="debug-value">--</span>°<br>
+            Orientation β: <span id="device-beta" class="debug-value">--</span>°<br>
+            Orientation γ: <span id="device-gamma" class="debug-value">--</span>°<br>
+            Screen: <span id="screen-size" class="debug-value">--</span>
+        </div>
+        
+        <div class="debug-section">
+            <strong>🎮 Three.js Renderer</strong><br>
+            FPS: <span id="render-fps" class="debug-value">--</span><br>
+            Objects: <span id="render-objects" class="debug-value">--</span><br>
+            Triangles: <span id="render-triangles" class="debug-value">--</span><br>
+            Draw Calls: <span id="render-calls" class="debug-value">--</span>
+        </div>
+        
+        <div class="debug-log">
+            <strong>📝 Event Log</strong>
+            <div id="log-container"></div>
+        </div>
     </div>
     
-    <!-- Controls for adjusting position -->
-    <div class="controls">
-        <button onclick="adjustAltitude(5)">Raise Objects +5m</button>
-        <button onclick="adjustAltitude(-5)">Lower Objects -5m</button>
-        <button onclick="resetAltitude()">Reset Altitude</button>
-        <button onclick="useCurrentLocation()">Use My Location</button>
+    <!-- Control Panel -->
+    <div id="control-panel">
+        <button class="control-button" onclick="calibrateNorth()">🧭 Calibrate North</button>
+        <button class="control-button" onclick="placeAtCurrentLocation()">📍 Place Here</button>
+        <button class="control-button" onclick="adjustScale(2)">⬆️ Scale x2</button>
+        <button class="control-button" onclick="adjustScale(0.5)">⬇️ Scale x0.5</button>
+        <button class="control-button" onclick="toggleDebugMode()">🔧 Toggle Debug</button>
+        <button class="control-button" onclick="resetScene()">🔄 Reset Scene</button>
     </div>
-    
-    <!-- Permission prompt (initially hidden) -->
-    <div id="permission-prompt" class="permission-prompt" style="display: none;">
-        <h2>Location Permission Required</h2>
-        <p>This AR experience needs access to your GPS location and camera to show virtual objects in the real world.</p>
-        <button onclick="requestPermissions()">Grant Permissions</button>
-    </div>
-    
-    <!-- A-Frame Scene with AR.js -->
-    <a-scene
-        vr-mode-ui="enabled: false"
-        arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
-        embedded
-        renderer="logarithmicDepthBuffer: true; precision: high; antialias: true; alpha: true;">
-        
-        <!-- Camera with GPS tracking - adjusted parameters for better tracking -->
-        <a-camera 
-            id="camera"
-            gps-new-camera="gpsMinDistance: 1; positionMinAccuracy: 20; alert: true;"
-            rotation-reader
-            position="0 0 0"
-            look-controls="enabled: false"
-            arjs-device-orientation-controls
-            cursor="rayOrigin: mouse"
-            raycaster="objects: [gps-new-entity-place]">
-        </a-camera>
-        
-        <!-- Main 15x15x15 meter cube with bright color and wireframe for visibility -->
-        <a-box
-            id="test-box-main"
-            material="color: #FF0000; opacity: 0.7; wireframe: false;"
-            scale="15 15 15"
-            position="0 7.5 0"
-            gps-new-entity-place="latitude: 49.58072; longitude: 11.03113;"
-            animation="property: rotation; to: 0 360 0; loop: true; dur: 20000">
-        </a-box>
-        
-        <!-- Wireframe overlay for better visibility -->
-        <a-box
-            id="test-box-wireframe"
-            material="color: #FFFF00; wireframe: true; wireframeLinewidth: 2;"
-            scale="15 15 15"
-            position="0 7.5 0"
-            gps-new-entity-place="latitude: 49.58072; longitude: 11.03113;">
-        </a-box>
-        
-        <!-- Ground level marker - 1m cube at ground -->
-        <a-box
-            id="ground-marker"
-            material="color: #00FF00; opacity: 0.8;"
-            scale="1 1 1"
-            position="0 0.5 0"
-            gps-new-entity-place="latitude: 49.58072; longitude: 11.03113;">
-        </a-box>
-        
-        <!-- Tall pole to help locate objects - 30m high -->
-        <a-cylinder
-            id="location-pole"
-            material="color: #0000FF; opacity: 0.8;"
-            radius="0.5"
-            height="30"
-            position="0 15 0"
-            gps-new-entity-place="latitude: 49.58072; longitude: 11.03113;">
-        </a-cylinder>
-        
-        <!-- Ground plane indicator - larger and more visible -->
-        <a-plane
-            id="ground-plane"
-            material="color: #FFFF00; opacity: 0.3; side: double;"
-            rotation="-90 0 0"
-            scale="25 25 1"
-            position="0 0.1 0"
-            gps-new-entity-place="latitude: 49.58072; longitude: 11.03113;">
-        </a-plane>
-        
-        <!-- Text label floating above -->
-        <a-text
-            id="label"
-            value="15m CUBE HERE"
-            scale="10 10 10"
-            position="0 20 0"
-            align="center"
-            color="#FFFFFF"
-            gps-new-entity-place="latitude: 49.58072; longitude: 11.03113;">
-        </a-text>
-        
-    </a-scene>
     
     <script>
-        // Configuration - UPDATE THESE WITH YOUR ACTUAL COORDINATES
-        const TARGET_LOCATION = {
-            latitude: 49.58072,  // Replace with your lawn's latitude
-            longitude: 11.03113  // Replace with your lawn's longitude
+        // Configuration
+        const CONFIG = {
+            target: {
+                latitude: 49.5749,  // UPDATE: Your lawn GPS latitude
+                longitude: 11.0293, // UPDATE: Your lawn GPS longitude
+                altitude: 0
+            },
+            cube: {
+                size: 15,           // 15x15x15 meter cube
+                color: 0xff0000,    // Red
+                opacity: 0.7,
+                wireframe: true
+            },
+            gps: {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 27000,
+                minAccuracy: 100,   // Minimum GPS accuracy in meters
+                smoothingFactor: 0.7 // GPS position smoothing
+            }
         };
         
-        let userLocation = null;
-        let watchId = null;
-        let currentAltitude = 0;
+        // Global variables
+        let scene, camera, renderer;
+        let locAr;
+        let cube, wireframeCube, pole, groundPlane;
+        let currentPosition = null;
+        let debugMode = true;
+        let frameCount = 0;
+        let lastFrameTime = Date.now();
+        let logEntries = [];
         
-        // Request permissions
-        function requestPermissions() {
-            document.getElementById('permission-prompt').style.display = 'none';
-            startLocationTracking();
+        // Logging system
+        function log(message, type = 'info') {
+            const timestamp = new Date().toTimeString().split(' ')[0];
+            const entry = `[${timestamp}] ${message}`;
             
-            // Also request camera permissions explicitly
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                navigator.mediaDevices.getUserMedia({ video: true })
-                    .then(stream => {
-                        console.log('Camera access granted');
-                        document.getElementById('camera-status').textContent = 'Yes';
-                        document.getElementById('camera-status').style.color = '#00ff00';
-                        // Stop the stream immediately, AR.js will handle it
-                        stream.getTracks().forEach(track => track.stop());
-                    })
-                    .catch(err => {
-                        console.error('Camera access denied:', err);
-                        document.getElementById('camera-status').textContent = 'Error';
-                        document.getElementById('camera-status').style.color = '#ff0000';
-                    });
+            console.log(entry);
+            logEntries.unshift({ message: entry, type });
+            if (logEntries.length > 50) logEntries.pop();
+            
+            updateLogDisplay();
+        }
+        
+        function updateLogDisplay() {
+            const container = document.getElementById('log-container');
+            if (container) {
+                container.innerHTML = logEntries
+                    .slice(0, 20)
+                    .map(e => `<div class="log-entry ${e.type}">${e.message}</div>`)
+                    .join('');
             }
         }
         
-        // Adjust altitude of all objects
-        function adjustAltitude(delta) {
-            currentAltitude += delta;
-            const entities = document.querySelectorAll('[gps-new-entity-place]');
-            entities.forEach(entity => {
-                const position = entity.getAttribute('position');
-                if (position) {
-                    entity.setAttribute('position', {
-                        x: position.x,
-                        y: position.y + delta,
-                        z: position.z
-                    });
-                }
+        // Initialize Three.js scene
+        function initThreeJS() {
+            log('Initializing Three.js renderer', 'info');
+            
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.fog = new THREE.Fog(0x000000, 10, 1000);
+            
+            // Camera setup (will be updated by LocAR)
+            camera = new THREE.PerspectiveCamera(
+                70,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                50000
+            );
+            
+            // Renderer setup
+            const canvas = document.getElementById('three-canvas');
+            renderer = new THREE.WebGLRenderer({
+                canvas: canvas,
+                alpha: true,
+                antialias: true,
+                logarithmicDepthBuffer: true
             });
-            console.log('Adjusted altitude by', delta, 'meters. Total offset:', currentAltitude);
-            alert(`Objects moved ${delta > 0 ? 'up' : 'down'} by ${Math.abs(delta)}m`);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            
+            // Add lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 10, 5);
+            scene.add(directionalLight);
+            
+            // Create 15x15x15 meter cube
+            const geometry = new THREE.BoxGeometry(CONFIG.cube.size, CONFIG.cube.size, CONFIG.cube.size);
+            const material = new THREE.MeshPhongMaterial({
+                color: CONFIG.cube.color,
+                opacity: CONFIG.cube.opacity,
+                transparent: true
+            });
+            cube = new THREE.Mesh(geometry, material);
+            cube.position.y = CONFIG.cube.size / 2; // Position bottom at ground level
+            
+            // Add wireframe overlay
+            const wireframeMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffff00,
+                wireframe: true,
+                opacity: 1
+            });
+            wireframeCube = new THREE.Mesh(geometry, wireframeMaterial);
+            wireframeCube.position.copy(cube.position);
+            
+            // Add vertical pole for visibility
+            const poleGeometry = new THREE.CylinderGeometry(0.5, 0.5, 50, 8);
+            const poleMaterial = new THREE.MeshPhongMaterial({ color: 0x0000ff });
+            pole = new THREE.Mesh(poleGeometry, poleMaterial);
+            pole.position.y = 25;
+            
+            // Add ground plane
+            const planeGeometry = new THREE.PlaneGeometry(30, 30);
+            const planeMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffff00,
+                opacity: 0.3,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            groundPlane = new THREE.Mesh(planeGeometry, planeMaterial);
+            groundPlane.rotation.x = -Math.PI / 2;
+            groundPlane.position.y = 0.1;
+            
+            // Create object group
+            const objectGroup = new THREE.Group();
+            objectGroup.add(cube);
+            objectGroup.add(wireframeCube);
+            objectGroup.add(pole);
+            objectGroup.add(groundPlane);
+            
+            scene.add(objectGroup);
+            
+            log(`Created ${CONFIG.cube.size}m cube at target location`, 'success');
+            document.getElementById('render-objects').textContent = scene.children.length;
         }
         
-        function resetAltitude() {
-            const entities = document.querySelectorAll('[gps-new-entity-place]');
-            entities.forEach((entity, index) => {
-                // Reset to original positions
-                if (entity.id === 'test-box-main' || entity.id === 'test-box-wireframe') {
-                    entity.setAttribute('position', '0 7.5 0');
-                } else if (entity.id === 'ground-marker') {
-                    entity.setAttribute('position', '0 0.5 0');
-                } else if (entity.id === 'location-pole') {
-                    entity.setAttribute('position', '0 15 0');
-                } else if (entity.id === 'ground-plane') {
-                    entity.setAttribute('position', '0 0.1 0');
-                } else if (entity.id === 'label') {
-                    entity.setAttribute('position', '0 20 0');
-                }
-            });
-            currentAltitude = 0;
-            alert('Altitude reset to original values');
-        }
-        
-        // Use current GPS location as object location
-        function useCurrentLocation() {
-            if (userLocation) {
-                const lat = userLocation.coords.latitude;
-                const lng = userLocation.coords.longitude;
-                
-                // Update all entities to current location
-                const entities = document.querySelectorAll('[gps-new-entity-place]');
-                entities.forEach(entity => {
-                    entity.setAttribute('gps-new-entity-place', `latitude: ${lat}; longitude: ${lng};`);
+        // Initialize LocAR
+        async function initLocAR() {
+            log('Initializing LocAR.js', 'info');
+            
+            try {
+                // Initialize video feed
+                const video = document.getElementById('video-feed');
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    }
                 });
+                video.srcObject = stream;
                 
-                TARGET_LOCATION.latitude = lat;
-                TARGET_LOCATION.longitude = lng;
+                document.getElementById('camera-status').textContent = 'Active';
+                document.getElementById('camera-status').className = 'debug-success';
+                log('Camera initialized successfully', 'success');
                 
-                alert(`Objects moved to your current location:\nLat: ${lat.toFixed(6)}\nLng: ${lng.toFixed(6)}`);
-            } else {
-                alert('GPS location not available yet');
+                // Initialize LocAR with Three.js integration
+                locAr = new locAR.LocationAR(scene, camera);
+                
+                // Set up GPS tracking
+                locAr.startGps(CONFIG.gps.maximumAge, CONFIG.gps.timeout);
+                
+                // Add location-based object
+                locAr.add(
+                    cube,
+                    CONFIG.target.longitude,
+                    CONFIG.target.latitude,
+                    CONFIG.target.altitude
+                );
+                
+                locAr.add(
+                    wireframeCube,
+                    CONFIG.target.longitude,
+                    CONFIG.target.latitude,
+                    CONFIG.target.altitude
+                );
+                
+                locAr.add(
+                    pole,
+                    CONFIG.target.longitude,
+                    CONFIG.target.latitude,
+                    CONFIG.target.altitude
+                );
+                
+                locAr.add(
+                    groundPlane,
+                    CONFIG.target.longitude,
+                    CONFIG.target.latitude,
+                    CONFIG.target.altitude
+                );
+                
+                // Set up device orientation
+                locAr.startOrientation();
+                
+                log('LocAR initialized with target coordinates', 'success');
+                document.getElementById('target-lat').textContent = CONFIG.target.latitude.toFixed(6);
+                document.getElementById('target-lng').textContent = CONFIG.target.longitude.toFixed(6);
+                
+                // Start render loop
+                animate();
+                
+            } catch (error) {
+                log(`LocAR initialization failed: ${error.message}`, 'error');
+                document.getElementById('camera-status').textContent = 'Failed';
+                document.getElementById('camera-status').className = 'debug-error';
             }
         }
         
-        // Calculate distance between two GPS points using Haversine formula
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Calculate FPS
+            frameCount++;
+            const currentTime = Date.now();
+            if (currentTime - lastFrameTime >= 1000) {
+                const fps = frameCount;
+                document.getElementById('render-fps').textContent = fps;
+                frameCount = 0;
+                lastFrameTime = currentTime;
+            }
+            
+            // Update LocAR
+            if (locAr) {
+                locAr.update();
+            }
+            
+            // Render scene
+            renderer.render(scene, camera);
+            
+            // Update renderer stats
+            if (renderer.info) {
+                document.getElementById('render-triangles').textContent = 
+                    renderer.info.render.triangles;
+                document.getElementById('render-calls').textContent = 
+                    renderer.info.render.calls;
+            }
+        }
+        
+        // GPS update handler
+        function handleGpsUpdate(position) {
+            currentPosition = position;
+            
+            document.getElementById('gps-status').textContent = 'Active';
+            document.getElementById('gps-status').className = 'debug-success';
+            document.getElementById('gps-lat').textContent = position.coords.latitude.toFixed(6);
+            document.getElementById('gps-lng').textContent = position.coords.longitude.toFixed(6);
+            document.getElementById('gps-accuracy').textContent = position.coords.accuracy.toFixed(1);
+            
+            if (position.coords.altitude !== null) {
+                document.getElementById('gps-altitude').textContent = 
+                    position.coords.altitude.toFixed(1);
+            }
+            
+            if (position.coords.heading !== null) {
+                document.getElementById('gps-heading').textContent = 
+                    position.coords.heading.toFixed(1);
+            }
+            
+            // Calculate distance and bearing to target
+            const distance = calculateDistance(
+                position.coords.latitude,
+                position.coords.longitude,
+                CONFIG.target.latitude,
+                CONFIG.target.longitude
+            );
+            
+            const bearing = calculateBearing(
+                position.coords.latitude,
+                position.coords.longitude,
+                CONFIG.target.latitude,
+                CONFIG.target.longitude
+            );
+            
+            document.getElementById('object-distance').textContent = distance.toFixed(1);
+            document.getElementById('object-bearing').textContent = bearing.toFixed(1);
+            
+            // Calculate relative position
+            const relativePos = calculateRelativePosition(
+                position.coords.latitude,
+                position.coords.longitude,
+                CONFIG.target.latitude,
+                CONFIG.target.longitude
+            );
+            
+            document.getElementById('object-x').textContent = relativePos.x.toFixed(1);
+            document.getElementById('object-y').textContent = relativePos.y.toFixed(1);
+            document.getElementById('object-z').textContent = relativePos.z.toFixed(1);
+            
+            // Check if object should be visible
+            const isVisible = checkObjectVisibility(relativePos);
+            document.getElementById('object-visible').textContent = isVisible ? 'Yes' : 'No';
+            document.getElementById('object-visible').className = 
+                isVisible ? 'debug-success' : 'debug-error';
+            
+            if (position.coords.accuracy < CONFIG.gps.minAccuracy) {
+                log(`GPS update: accuracy ${position.coords.accuracy.toFixed(1)}m`, 'info');
+            } else {
+                log(`GPS accuracy poor: ${position.coords.accuracy.toFixed(1)}m`, 'error');
+            }
+        }
+        
+        // Device orientation handler
+        function handleOrientation(event) {
+            if (event.alpha !== null) {
+                document.getElementById('device-alpha').textContent = event.alpha.toFixed(1);
+                document.getElementById('device-beta').textContent = event.beta.toFixed(1);
+                document.getElementById('device-gamma').textContent = event.gamma.toFixed(1);
+            }
+        }
+        
+        // Calculate distance using Haversine formula
         function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371e3; // Earth's radius in meters
+            const R = 6371e3;
             const φ1 = lat1 * Math.PI/180;
             const φ2 = lat2 * Math.PI/180;
             const Δφ = (lat2-lat1) * Math.PI/180;
@@ -304,154 +540,151 @@
             return R * c;
         }
         
-        // Update status display
-        function updateStatus(position) {
-            document.getElementById('lat').textContent = position.coords.latitude.toFixed(6);
-            document.getElementById('lng').textContent = position.coords.longitude.toFixed(6);
-            document.getElementById('accuracy').textContent = position.coords.accuracy.toFixed(1);
+        // Calculate bearing between two points
+        function calculateBearing(lat1, lon1, lat2, lon2) {
+            const φ1 = lat1 * Math.PI/180;
+            const φ2 = lat2 * Math.PI/180;
+            const Δλ = (lon2-lon1) * Math.PI/180;
             
-            if (position.coords.heading !== null) {
-                document.getElementById('heading').textContent = position.coords.heading.toFixed(1);
-            }
+            const y = Math.sin(Δλ) * Math.cos(φ2);
+            const x = Math.cos(φ1)*Math.sin(φ2) -
+                      Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
             
-            const distance = calculateDistance(
-                position.coords.latitude,
-                position.coords.longitude,
-                TARGET_LOCATION.latitude,
-                TARGET_LOCATION.longitude
+            const θ = Math.atan2(y, x);
+            
+            return (θ * 180/Math.PI + 360) % 360;
+        }
+        
+        // Calculate relative 3D position
+        function calculateRelativePosition(lat1, lon1, lat2, lon2) {
+            const distance = calculateDistance(lat1, lon1, lat2, lon2);
+            const bearing = calculateBearing(lat1, lon1, lat2, lon2) * Math.PI/180;
+            
+            return {
+                x: Math.sin(bearing) * distance,
+                y: 0, // Assuming flat ground
+                z: -Math.cos(bearing) * distance
+            };
+        }
+        
+        // Check if object should be visible
+        function checkObjectVisibility(relativePos) {
+            const distance = Math.sqrt(
+                relativePos.x * relativePos.x + 
+                relativePos.z * relativePos.z
             );
-            
-            document.getElementById('distance').textContent = distance.toFixed(1);
-            document.getElementById('gps-status').textContent = 'Active';
-            document.getElementById('gps-status').style.color = '#00ff00';
-            
-            // Log for debugging
-            console.log('GPS Update:', {
-                userLat: position.coords.latitude,
-                userLng: position.coords.longitude,
-                targetLat: TARGET_LOCATION.latitude,
-                targetLng: TARGET_LOCATION.longitude,
-                distance: distance,
-                accuracy: position.coords.accuracy
-            });
+            return distance < 500; // Visible within 500 meters
         }
         
-        // Start GPS tracking
-        function startLocationTracking() {
-            if ('geolocation' in navigator) {
-                const options = {
-                    enableHighAccuracy: true,
-                    maximumAge: 0,
-                    timeout: 27000
-                };
+        // Control functions
+        function calibrateNorth() {
+            log('Calibrating compass north', 'info');
+            if (locAr) {
+                locAr.calibrateNorth();
+            }
+            alert('Point your device north and press OK');
+        }
+        
+        function placeAtCurrentLocation() {
+            if (currentPosition) {
+                CONFIG.target.latitude = currentPosition.coords.latitude;
+                CONFIG.target.longitude = currentPosition.coords.longitude;
                 
-                // Get initial position
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        console.log('Initial position obtained:', position);
-                        userLocation = position;
-                        updateStatus(position);
-                        
-                        // Update camera position
-                        const camera = document.getElementById('camera');
-                        if (camera) {
-                            // Remove simulation attributes once we have real GPS
-                            camera.setAttribute('gps-new-camera', {
-                                positionMinAccuracy: 20,
-                                gpsMinDistance: 1,
-                                alert: true
-                            });
-                        }
-                    },
-                    (error) => {
-                        console.error('GPS Error:', error);
-                        document.getElementById('gps-status').textContent = 'Error: ' + error.message;
-                        document.getElementById('gps-status').style.color = '#ff0000';
-                    },
-                    options
-                );
+                log(`Objects moved to current location: ${CONFIG.target.latitude.toFixed(6)}, ${CONFIG.target.longitude.toFixed(6)}`, 'success');
                 
-                // Watch position for updates
-                watchId = navigator.geolocation.watchPosition(
-                    (position) => {
-                        console.log('Position update:', position);
-                        userLocation = position;
-                        updateStatus(position);
-                    },
-                    (error) => {
-                        console.error('GPS Watch Error:', error);
-                        document.getElementById('gps-status').textContent = 'Watch Error';
-                        document.getElementById('gps-status').style.color = '#ff0000';
-                    },
-                    options
-                );
+                document.getElementById('target-lat').textContent = CONFIG.target.latitude.toFixed(6);
+                document.getElementById('target-lng').textContent = CONFIG.target.longitude.toFixed(6);
+                
+                // Reinitialize LocAR with new position
+                resetScene();
             } else {
-                alert('Geolocation is not supported by your browser');
+                log('No GPS position available', 'error');
             }
         }
         
-        // Monitor device orientation
-        window.addEventListener('deviceorientation', (event) => {
-            if (event.alpha !== null) {
-                document.getElementById('heading').textContent = event.alpha.toFixed(1);
+        function adjustScale(factor) {
+            if (cube) {
+                cube.scale.multiplyScalar(factor);
+                wireframeCube.scale.multiplyScalar(factor);
+                pole.scale.multiplyScalar(factor);
+                groundPlane.scale.multiplyScalar(factor);
+                
+                const newSize = CONFIG.cube.size * cube.scale.x;
+                log(`Scale adjusted by ${factor}x. Cube size: ${newSize.toFixed(1)}m`, 'info');
             }
-        });
+        }
+        
+        function toggleDebugMode() {
+            debugMode = !debugMode;
+            document.getElementById('debug-console').style.display = 
+                debugMode ? 'block' : 'none';
+            log(`Debug mode ${debugMode ? 'enabled' : 'disabled'}`, 'info');
+        }
+        
+        function resetScene() {
+            log('Resetting scene', 'info');
+            
+            if (locAr) {
+                locAr.stopGps();
+                locAr.stopOrientation();
+            }
+            
+            // Clear scene
+            while(scene.children.length > 0) {
+                scene.remove(scene.children[0]);
+            }
+            
+            // Reinitialize
+            initThreeJS();
+            initLocAR();
+        }
         
         // Initialize on page load
-        window.addEventListener('load', () => {
-            // Check camera stream status
-            const scene = document.querySelector('a-scene');
-            if (scene) {
-                scene.addEventListener('camera-init', () => {
-                    console.log('AR.js camera initialized');
-                    document.getElementById('camera-status').textContent = 'Yes';
-                    document.getElementById('camera-status').style.color = '#00ff00';
-                });
+        window.addEventListener('load', async () => {
+            log('Page loaded, initializing AR experience', 'info');
+            
+            // Update screen size
+            document.getElementById('screen-size').textContent = 
+                `${window.innerWidth}x${window.innerHeight}`;
+            
+            // Set up GPS listener
+            navigator.geolocation.watchPosition(
+                handleGpsUpdate,
+                (error) => {
+                    log(`GPS error: ${error.message}`, 'error');
+                    document.getElementById('gps-status').textContent = 'Error';
+                    document.getElementById('gps-status').className = 'debug-error';
+                },
+                CONFIG.gps
+            );
+            
+            // Set up orientation listener
+            window.addEventListener('deviceorientation', handleOrientation);
+            
+            // Initialize Three.js and LocAR
+            initThreeJS();
+            await initLocAR();
+            
+            // Window resize handler
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
                 
-                scene.addEventListener('camera-error', () => {
-                    console.log('AR.js camera error');
-                    document.getElementById('camera-status').textContent = 'Error';
-                    document.getElementById('camera-status').style.color = '#ff0000';
-                });
-            }
-            
-            // Check if we need to show permission prompt
-            if (navigator.permissions) {
-                navigator.permissions.query({name: 'geolocation'}).then((result) => {
-                    if (result.state === 'granted') {
-                        requestPermissions(); // Also requests camera
-                    } else {
-                        document.getElementById('permission-prompt').style.display = 'block';
-                    }
-                });
-            } else {
-                // Fallback for browsers without Permissions API
-                requestPermissions();
-            }
-            
-            // Add event listeners for AR.js debugging
-            window.addEventListener('gps-camera-update-position', e => {
-                console.log('📍 Camera GPS position updated:', e.detail);
+                document.getElementById('screen-size').textContent = 
+                    `${window.innerWidth}x${window.innerHeight}`;
             });
             
-            window.addEventListener('gps-entity-place-update-position', e => {
-                console.log('📦 Entity position updated:', e.detail);
-            });
-            
-            window.addEventListener('gps-entity-place-added', e => {
-                console.log('✅ Entity added to scene:', e.detail);
-            });
-            
-            // Log AR.js initialization
-            console.log('AR.js Location-based AR initialized');
-            console.log('Target location:', TARGET_LOCATION);
+            log('Initialization complete', 'success');
         });
         
-        // Clean up on page unload
-        window.addEventListener('beforeunload', () => {
-            if (watchId) {
-                navigator.geolocation.clearWatch(watchId);
-            }
+        // Error handling
+        window.addEventListener('error', (event) => {
+            log(`JavaScript error: ${event.message}`, 'error');
+        });
+        
+        window.addEventListener('unhandledrejection', (event) => {
+            log(`Promise rejection: ${event.reason}`, 'error');
         });
     </script>
 </body>
