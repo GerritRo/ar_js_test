@@ -6,11 +6,11 @@
 <script type='text/javascript' src='https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js'></script>
 </head>
 <body>
-<a-scene vr-mode-ui='enabled: false' arjs='sourceType: webcam; videoTexture: true; debugUIEnabled: false' renderer='antialias: true; alpha: true'>
+<a-scene vr-mode-ui='enabled: false' arjs='sourceType: webcam; videoTexture: true; debugUIEnabled: true' renderer='antialias: true; alpha: true'>
     <a-camera gps-new-camera='gpsMinDistance: 5'></a-camera>
     <a-entity
           scale="0.5 0.5 0.5"
-          gltf-model="./assets/dish/object.gltf"
+          gltf-model="./assets/dish/dish.gltf"
           gps-new-entity-place="latitude: 49.580730; longitude: 11.031220"
     ></a-entity>
 </a-scene>
