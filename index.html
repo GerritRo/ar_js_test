@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <title>AR.js Geolocation Experience</title>
+    
+    <!-- A-Frame and AR.js libraries -->
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+    
+    <style>
+        .status-overlay {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 999;
+            max-width: 300px;
+        }
+        
+        .status-overlay .coords {
+            color: #00ff00;
+            margin-top: 5px;
+        }
+        
+        .status-overlay .distance {
+            color: #ffff00;
+            margin-top: 5px;
+        }
+        
+        .status-overlay .error {
+            color: #ff0000;
+            margin-top: 5px;
+        }
+        
+        .permission-prompt {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 1000;
+        }
+        
+        .permission-prompt button {
+            margin-top: 20px;
+            padding: 10px 30px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <!-- Status overlay for debugging -->
+    <div id="status" class="status-overlay">
+        <div>GPS Status: <span id="gps-status">Initializing...</span></div>
+        <div class="coords">Lat: <span id="lat">--</span></div>
+        <div class="coords">Lng: <span id="lng">--</span></div>
+        <div class="coords">Accuracy: <span id="accuracy">--</span>m</div>
+        <div class="distance">Distance to Object: <span id="distance">--</span>m</div>
+    </div>
+    
+    <!-- Permission prompt (initially hidden) -->
+    <div id="permission-prompt" class="permission-prompt" style="display: none;">
+        <h2>Location Permission Required</h2>
+        <p>This AR experience needs access to your GPS location and camera to show virtual objects in the real world.</p>
+        <button onclick="requestPermissions()">Grant Permissions</button>
+    </div>
+    
+    <!-- A-Frame Scene with AR.js -->
+    <a-scene
+        vr-mode-ui="enabled: false"
+        arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
+        embedded
+        renderer="logarithmicDepthBuffer: true; precision: high; antialias: true; alpha: true;">
+        
+        <!-- Camera with GPS tracking -->
+        <a-camera 
+            id="camera"
+            gps-new-camera="gpsMinDistance: 5; positionMinAccuracy: 100; alert: true;"
+            rotation-reader
+            look-controls="enabled: false"
+            arjs-device-orientation-controls>
+        </a-camera>
+        
+        <!-- Test object: A large red cube at specific GPS coordinates -->
+        <!-- Replace these coordinates with your actual location -->
+        <a-box
+            id="test-box"
+            color="red"
+            scale="5 5 5"
+            gps-new-entity-place="latitude: 49.5749; longitude: 11.0293;"
+            animation="property: rotation; to: 0 360 0; loop: true; dur: 10000">
+        </a-box>
+        
+        <!-- Ground plane indicator -->
+        <a-plane
+            id="ground-plane"
+            color="yellow"
+            rotation="-90 0 0"
+            scale="10 10 1"
+            opacity="0.5"
+            gps-new-entity-place="latitude: 49.5749; longitude: 11.0293;">
+        </a-plane>
+        
+    </a-scene>
+    
+    <script>
+        // Configuration - UPDATE THESE WITH YOUR ACTUAL COORDINATES
+        const TARGET_LOCATION = {
+            latitude: 49.58072,  // Replace with your lawn's latitude
+            longitude: 11.03113  // Replace with your lawn's longitude
+        };
+        
+        let userLocation = null;
+        let watchId = null;
+        
+        // Request permissions
+        function requestPermissions() {
+            document.getElementById('permission-prompt').style.display = 'none';
+            startLocationTracking();
+        }
+        
+        // Calculate distance between two GPS points using Haversine formula
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; // Earth's radius in meters
+            const φ1 = lat1 * Math.PI/180;
+            const φ2 = lat2 * Math.PI/180;
+            const Δφ = (lat2-lat1) * Math.PI/180;
+            const Δλ = (lon2-lon1) * Math.PI/180;
+            
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            
+            return R * c;
+        }
+        
+        // Update status display
+        function updateStatus(position) {
+            document.getElementById('lat').textContent = position.coords.latitude.toFixed(6);
+            document.getElementById('lng').textContent = position.coords.longitude.toFixed(6);
+            document.getElementById('accuracy').textContent = position.coords.accuracy.toFixed(1);
+            
+            const distance = calculateDistance(
+                position.coords.latitude,
+                position.coords.longitude,
+                TARGET_LOCATION.latitude,
+                TARGET_LOCATION.longitude
+            );
+            
+            document.getElementById('distance').textContent = distance.toFixed(1);
+            document.getElementById('gps-status').textContent = 'Active';
+            document.getElementById('gps-status').style.color = '#00ff00';
+        }
+        
+        // Start GPS tracking
+        function startLocationTracking() {
+            if ('geolocation' in navigator) {
+                const options = {
+                    enableHighAccuracy: true,
+                    maximumAge: 0,
+                    timeout: 27000
+                };
+                
+                // Get initial position
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        console.log('Initial position obtained:', position);
+                        userLocation = position;
+                        updateStatus(position);
+                        
+                        // Update AR.js entities with current position
+                        const camera = document.getElementById('camera');
+                        if (camera) {
+                            camera.setAttribute('gps-new-camera', {
+                                positionMinAccuracy: 100,
+                                gpsMinDistance: 5
+                            });
+                        }
+                    },
+                    (error) => {
+                        console.error('GPS Error:', error);
+                        document.getElementById('gps-status').textContent = 'Error: ' + error.message;
+                        document.getElementById('gps-status').style.color = '#ff0000';
+                    },
+                    options
+                );
+                
+                // Watch position for updates
+                watchId = navigator.geolocation.watchPosition(
+                    (position) => {
+                        console.log('Position update:', position);
+                        userLocation = position;
+                        updateStatus(position);
+                    },
+                    (error) => {
+                        console.error('GPS Watch Error:', error);
+                        document.getElementById('gps-status').textContent = 'Watch Error';
+                        document.getElementById('gps-status').style.color = '#ff0000';
+                    },
+                    options
+                );
+            } else {
+                alert('Geolocation is not supported by your browser');
+            }
+        }
+        
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            // Check if we need to show permission prompt
+            if (navigator.permissions) {
+                navigator.permissions.query({name: 'geolocation'}).then((result) => {
+                    if (result.state === 'granted') {
+                        startLocationTracking();
+                    } else {
+                        document.getElementById('permission-prompt').style.display = 'block';
+                    }
+                });
+            } else {
+                // Fallback for browsers without Permissions API
+                startLocationTracking();
+            }
+            
+            // Add event listeners for AR.js
+            window.addEventListener('gps-camera-update-position', e => {
+                console.log('Camera GPS position updated:', e.detail);
+            });
+            
+            window.addEventListener('gps-entity-place-update-position', e => {
+                console.log('Entity position updated:', e.detail);
+            });
+        });
+        
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+            }
+        });
+    </script>
+</body>
+</html>
