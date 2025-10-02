@@ -1,75 +1,18 @@
-<!DOCTYPE html>
 <html>
 <head>
-    <meta charset='utf-8'>
-    <meta http-equiv='X-UA-Compatible' content='IE=edge'>
-    <title>GeoAR.js demo</title>
-    <script src='https://aframe.io/releases/0.9.2/aframe.min.js'></script>
-    <script src="https://raw.githack.com/jeromeetienne/AR.js/master/aframe/build/aframe-ar.min.js"></script>
-    <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
-    <script>
-        THREEx.ArToolkitContext.baseURL = 'https://raw.githack.com/jeromeetienne/ar.js/master/three.js/'
-
-        // Smooth interpolation for GPS-based objects
-        AFRAME.registerComponent('smooth-gps', {
-          schema: {
-            lerpFactor: {type: 'number', default: 0.1} // 0.1 = smooth, 1.0 = instant
-          },
-          init: function () {
-            this.smoothedPosition = new THREE.Vector3();
-            this.smoothedQuaternion = new THREE.Quaternion();
-            this.hasInitial = false;
-          },
-          tick: function () {
-            let obj = this.el.object3D;
-
-            if (!this.hasInitial) {
-              this.smoothedPosition.copy(obj.position);
-              this.smoothedQuaternion.copy(obj.quaternion);
-              this.hasInitial = true;
-            }
-
-            // Smooth world position
-            this.smoothedPosition.lerp(obj.position, this.data.lerpFactor);
-            obj.position.copy(this.smoothedPosition);
-
-            // Smooth rotation
-            this.smoothedQuaternion.slerp(obj.quaternion, this.data.lerpFactor);
-            obj.quaternion.copy(this.smoothedQuaternion);
-          }
-        });
-
-        // Clamp altitude in world space (optional)
-        AFRAME.registerComponent('fixed-altitude', {
-          schema: { y: {type: 'number', default: 0} },
-          tick: function () {
-            this.el.object3D.position.y = this.data.y;
-          }
-        });
-    </script>
+<title>AR.js A-Frame Location-based</title>
+<script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+<script type='text/javascript' src='https://raw.githack.com/AR-js-org/AR.js/3.4.7/three.js/build/ar-threex-location-only.js'></script>
+<script type='text/javascript' src='https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js'></script>
 </head>
-
-<body style='margin: 0; overflow: hidden;'>
-    <a-scene
-        vr-mode-ui="enabled: false"
-        embedded
-        arjs='sourceType: webcam; sourceWidth:1280; sourceHeight:960; displayWidth:1280; displayHeight:960; debugUIEnabled: true;'>
-
-        <!-- Camera: standard GPS camera with min distance + max accuracy -->
-        <a-camera gps-camera rotation-reader 
-                  gpsMinDistance="5" 
-                  gpsMaxAccuracy="30">
-        </a-camera>
-
-        <!-- Cube anchored to real GPS location, smoothed, optional fixed altitude -->
-        <a-entity gltf-model="./assets/animated_cube/AnimatedCube.gltf" 
-                  rotation="0 180 0" 
-                  scale="1 1 1" 
-                  gps-entity-place="longitude: 11.031220; latitude: 49.580730;" 
-                  animation-mixer
-                  smooth-gps="lerpFactor: 0.05"
-                  fixed-altitude="y: 0">
-        </a-entity>
-    </a-scene>
+<body>
+<a-scene vr-mode-ui='enabled: false' arjs='sourceType: webcam; videoTexture: true; debugUIEnabled: false' renderer='antialias: true; alpha: true'>
+    <a-camera gps-new-camera='gpsMinDistance: 5'></a-camera>
+    <a-entity
+          scale="0.5 0.5 0.5"
+          gltf-model="./assets/dish/object.gltf"
+          gps-new-entity-place="latitude: 49.580730; longitude: 11.031220"
+    ></a-entity>
+</a-scene>
 </body>
 </html>

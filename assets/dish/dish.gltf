@@ -1,0 +1,211 @@
+{
+    "asset": {
+        "version": "2.0",
+        "generator": "Open Asset Import Library (assimp v5.4.0)"
+    },
+    "extensionsUsed": [
+        "KHR_materials_volume",
+        "FB_ngon_encoding"
+    ],
+    "accessors": [
+        {
+            "bufferView": 0,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 20795,
+            "type": "VEC3",
+            "max": [
+                45.78266906738281,
+                45.80767059326172,
+                69.11935424804688
+            ],
+            "min": [
+                -45.78266906738281,
+                -45.507667541503906,
+                -16.419355392456055
+            ]
+        },
+        {
+            "bufferView": 1,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 20795,
+            "type": "VEC3",
+            "max": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "min": [
+                -1.0,
+                -1.0,
+                -1.0
+            ]
+        },
+        {
+            "bufferView": 2,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 20795,
+            "type": "VEC2",
+            "max": [
+                0.9998615980148315,
+                0.9998615980148315
+            ],
+            "min": [
+                0.00014462570834439248,
+                0.12223803997039795
+            ]
+        },
+        {
+            "bufferView": 3,
+            "byteOffset": 0,
+            "componentType": 5125,
+            "count": 44556,
+            "type": "SCALAR",
+            "max": [
+                20794
+            ],
+            "min": [
+                0
+            ]
+        }
+    ],
+    "buffers": [
+        {
+            "byteLength": 843664,
+            "uri": "70 meter dish_0.bin"
+        }
+    ],
+    "bufferViews": [
+        {
+            "buffer": 0,
+            "byteOffset": 0,
+            "byteLength": 249540,
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteOffset": 249540,
+            "byteLength": 249540,
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteOffset": 499080,
+            "byteLength": 166360,
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteOffset": 665440,
+            "byteLength": 178224,
+            "target": 34963
+        }
+    ],
+    "images": [
+        {
+            "uri": "textures/image_0.png"
+        }
+    ],
+    "materials": [
+        {
+            "name": "Antenna",
+            "pbrMetallicRoughness": {
+                "baseColorTexture": {
+                    "index": 0
+                },
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.7279706001281738
+            }
+        }
+    ],
+    "meshes": [
+        {
+            "name": "meshes[0]",
+            "primitives": [
+                {
+                    "mode": 4,
+                    "material": 0,
+                    "indices": 3,
+                    "attributes": {
+                        "POSITION": 0,
+                        "NORMAL": 1,
+                        "TEXCOORD_0": 2
+                    }
+                }
+            ]
+        }
+    ],
+    "nodes": [
+        {
+            "name": "70 meter dish",
+            "children": [
+                1
+            ]
+        },
+        {
+            "name": "<3DSRoot>",
+            "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -3.029462618542311e-7,
+                -0.9999999403953552,
+                0.0,
+                0.0,
+                0.9999999403953552,
+                -3.029462618542311e-7,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0
+            ],
+            "children": [
+                2
+            ],
+            "extras": {
+                "name": "<3DSRoot>"
+            }
+        },
+        {
+            "name": "f_70m_rev_",
+            "children": [
+                3
+            ],
+            "extras": {
+                "name": "f_70m_rev_"
+            }
+        },
+        {
+            "name": "70m_rev_e",
+            "mesh": 0,
+            "extras": {
+                "name": "70m_rev_e."
+            }
+        }
+    ],
+    "samplers": [
+        {
+            "magFilter": 9729,
+            "minFilter": 9987
+        }
+    ],
+    "scenes": [
+        {
+            "nodes": [
+                0
+            ]
+        }
+    ],
+    "textures": [
+        {
+            "source": 0,
+            "sampler": 0
+        }
+    ],
+    "scene": 0
+}
